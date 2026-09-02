@@ -9,7 +9,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
 
     steps:
       - name: Baixar repositório
@@ -20,82 +20,59 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
 
-      - name: Preparar capa e áudio
+      - name: Extrair capa e áudio
         run: |
           mkdir -p build dist
 
           ffmpeg -y -v error \
             -i "OS ATUAIS -05- Meu segredo (RITMO JOVEM) (1).mp4" \
-            -vf "crop=660:660:311:30,scale=1320:1320:flags=lanczos,unsharp=5:5:0.6:5:5:0.0,eq=saturation=1.06:contrast=1.04" \
-            -frames:v 1 build/cover.png
+            -vf "crop=660:660:311:30,scale=1000:1000:flags=lanczos" \
+            -frames:v 1 \
+            build/cover.png
 
           ffmpeg -y -v error \
             -i "OS ATUAIS -05- Meu segredo (RITMO JOVEM) (1).mp4" \
-            -vn -ac 2 -ar 44100 build/song.wav
+            -vn -ac 2 -ar 48000 \
+            build/song.m4a
 
-      - name: Renderizar introdução
+      - name: Criar introdução
         run: |
           FONT=/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf
 
           ffmpeg -y -v error \
             -loop 1 -i build/cover.png \
-            -f lavfi -i "anullsrc=r=48000:cl=stereo" \
-            -filter_complex "\
-              [0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=35:10,eq=brightness=-0.38[bg]; \
-              [0:v]scale=620:620[cover]; \
-              [bg][cover]overlay=(W-w)/2:(H-h)/2, \
-              drawtext=fontfile=$FONT:text='OS ATUAIS':fontcolor=white:fontsize=108:x=(w-text_w)/2:y=95, \
-              drawtext=fontfile=$FONT:text='MEU SEGREDO':fontcolor=0xFFC125:fontsize=70:x=(w-text_w)/2:y=842, \
-              drawtext=fontfile=$FONT:text='EU VOLTEI · VOLUME 9':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=928, \
-              format=yuv420p[v]" \
+            -f lavfi -i anullsrc=r=48000:cl=stereo \
+            -t 18 \
+            -filter_complex "[0:v]scale=700:700[art];color=c=0x111111:s=1920x1080:d=18[bg];[bg][art]overlay=110:190,drawtext=fontfile=${FONT}:text='OS ATUAIS':fontcolor=white:fontsize=104:x=930:y=310,drawtext=fontfile=${FONT}:text='MEU SEGREDO':fontcolor=0xFFC125:fontsize=68:x=930:y=445,drawtext=fontfile=${FONT}:text='EU VOLTEI · VOLUME 9':fontcolor=white:fontsize=38:x=930:y=545,drawtext=fontfile=${FONT}:text='OS REIS DO BAILE':fontcolor=white@0.8:fontsize=30:x=930:y=650,format=yuv420p[v]" \
             -map "[v]" -map 1:a \
-            -t 55 -r 30 \
-            -c:v libx264 -preset medium -crf 20 \
-            -c:a aac -b:a 192k \
+            -r 30 -c:v libx264 -preset veryfast -crf 21 \
+            -c:a aac -b:a 160k \
             build/intro.mp4
 
-      - name: Renderizar bloco da música
+      - name: Criar vídeo da música
         run: |
           FONT=/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf
 
           ffmpeg -y -v error \
-            -loop 1 -i build/cover.png \
-            -i build/song.wav \
-            -filter_complex "\
-              [0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=35:10,eq=brightness=-0.45[bg]; \
-              [0:v]scale=690:690[cover]; \
-              [bg][cover]overlay=150:190[base]; \
-              [1:a]showspectrum=s=1920x250:mode=combined:color=rainbow:scale=cbrt:slide=scroll,format=rgba[spectrum]; \
-              [base][spectrum]overlay=0:830, \
-              drawtext=fontfile=$FONT:text='OS ATUAIS':fontcolor=white:fontsize=58:x=930:y=285, \
-              drawtext=fontfile=$FONT:text='EU VOLTEI · VOLUME 9':fontcolor=0xFFC125:fontsize=38:x=930:y=370, \
-              drawtext=fontfile=$FONT:text='MEU SEGREDO':fontcolor=white:fontsize=72:x=930:y=450, \
-              drawtext=fontfile=$FONT:text='OS REIS DO BAILE':fontcolor=white@0.85:fontsize=32:x=930:y=555, \
-              drawbox=x=80:y=1020:w=1760:h=7:color=white@0.70:t=fill, \
-              format=yuv420p[v]" \
-            -map "[v]" -map 1:a \
-            -r 30 \
-            -c:v libx264 -preset medium -crf 21 \
-            -c:a aac -b:a 192k \
+            -i "OS ATUAIS -05- Meu segredo (RITMO JOVEM) (1).mp4" \
+            -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,drawbox=x=0:y=940:w=1920:h=140:color=black@0.72:t=fill,drawtext=fontfile=${FONT}:text='OS ATUAIS  ·  MEU SEGREDO':fontcolor=white:fontsize=45:x=70:y=968,drawtext=fontfile=${FONT}:text='EU VOLTEI · VOLUME 9':fontcolor=0xFFC125:fontsize=32:x=70:y=1028,format=yuv420p[v]" \
+            -map "[v]" -map 0:a \
+            -r 30 -c:v libx264 -preset veryfast -crf 21 \
+            -c:a aac -b:a 192k -ar 48000 \
             build/music.mp4
 
-      - name: Renderizar encerramento
+      - name: Criar encerramento
         run: |
           FONT=/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf
 
           ffmpeg -y -v error \
             -loop 1 -i build/cover.png \
-            -f lavfi -i "anullsrc=r=48000:cl=stereo" \
-            -filter_complex "\
-              [0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=35:10,eq=brightness=-0.52, \
-              drawtext=fontfile=$FONT:text='QUAL LEMBRANÇA ESSA MÚSICA DESPERTA?':fontcolor=white:fontsize=60:x=(w-text_w)/2:y=360, \
-              drawtext=fontfile=$FONT:text='DEIXE SEU COMENTÁRIO':fontcolor=0xFFC125:fontsize=54:x=(w-text_w)/2:y=500, \
-              drawtext=fontfile=$FONT:text='INSCREVA-SE PARA MAIS HISTÓRIAS DA MÚSICA':fontcolor=white:fontsize=34:x=(w-text_w)/2:y=650, \
-              format=yuv420p[v]" \
+            -f lavfi -i anullsrc=r=48000:cl=stereo \
+            -t 18 \
+            -filter_complex "[0:v]scale=1920:1920,crop=1920:1080:0:350,eq=brightness=-0.55,drawbox=x=0:y=0:w=1920:h=1080:color=black@0.20:t=fill,drawtext=fontfile=${FONT}:text='QUAL LEMBRANÇA ESSA MÚSICA DESPERTA?':fontcolor=white:fontsize=58:x=(w-text_w)/2:y=370,drawtext=fontfile=${FONT}:text='DEIXE SEU COMENTÁRIO':fontcolor=0xFFC125:fontsize=54:x=(w-text_w)/2:y=505,drawtext=fontfile=${FONT}:text='INSCREVA-SE PARA MAIS HISTÓRIAS DA MÚSICA':fontcolor=white:fontsize=34:x=(w-text_w)/2:y=650,format=yuv420p[v]" \
             -map "[v]" -map 1:a \
-            -t 30 -r 30 \
-            -c:v libx264 -preset medium -crf 20 \
-            -c:a aac -b:a 192k \
+            -r 30 -c:v libx264 -preset veryfast -crf 21 \
+            -c:a aac -b:a 160k \
             build/outro.mp4
 
       - name: Montar vídeo final e thumbnail
@@ -107,7 +84,7 @@ jobs:
 
           ffmpeg -y -v error \
             -f concat -safe 0 -i build/concat.txt \
-            -c:v libx264 -preset slow -crf 23 \
+            -c:v libx264 -preset veryfast -crf 22 \
             -maxrate 5500k -bufsize 9000k \
             -pix_fmt yuv420p -profile:v high -level 4.1 -g 60 \
             -c:a aac -b:a 192k -ar 48000 \
@@ -116,34 +93,32 @@ jobs:
 
           ffmpeg -y -v error \
             -i build/cover.png \
-            -vf "scale=620:620,rotate='-8*PI/180':ow=rotw(iw):oh=roth(ih):c=black@0,scale=1280:720,drawtext=fontfile=$FONT:text='MEU SEGREDO':fontcolor=white:fontsize=95:x=50:y=70,drawtext=fontfile=$FONT:text='OS ATUAIS':fontcolor=0xFFC125:fontsize=58:x=50:y=185" \
+            -vf "scale=600:600,rotate=-0.10:ow=rotw(iw):oh=roth(ih):c=black@0,scale=1280:720,drawtext=fontfile=${FONT}:text='MEU SEGREDO':fontcolor=white:fontsize=92:x=45:y=65,drawtext=fontfile=${FONT}:text='OS ATUAIS':fontcolor=0xFFC125:fontsize=55:x=45:y=180" \
             -frames:v 1 \
             dist/thumbnail.jpg
 
           cat > dist/descricao.txt <<'EOF'
           Os Atuais – Meu Segredo | Eu Voltei, Vol. 9
 
-          00:00 História e contexto
-          00:55 Meu Segredo
-          03:45 Encerramento
+          00:00 Introdução
+          00:18 Meu Segredo
+          03:08 Encerramento
 
-          Ficha do disco:
           Artista: Os Atuais
           Faixa: Meu Segredo
           Disco: Eu Voltei – Volume 9
           Selo visível na capa: América
 
-          Fontes consultadas:
+          Fontes:
           https://osatuais.com.br/historico/
           https://pt.wikipedia.org/wiki/Os_Atuais
           https://www.rz.net.br/banda/os-atuais
 
-          Comente qual lembrança essa música desperta em você e inscreva-se no canal.
-
+          Comente qual lembrança essa música desperta em você.
           #OsAtuais #MeuSegredo #MusicaGaucha
           EOF
 
-      - name: Verificar arquivos finais
+      - name: Validar entregáveis
         run: |
           ffprobe -v error \
             -show_entries format=duration:stream=codec_name,codec_type,width,height,r_frame_rate \
@@ -153,7 +128,7 @@ jobs:
           test -s dist/thumbnail.jpg
           test -s dist/descricao.txt
 
-      - name: Publicar MP4, thumbnail e descrição
+      - name: Publicar entregáveis
         uses: actions/upload-artifact@v4
         with:
           name: os-atuais-meu-segredo-youtube-deliverables
